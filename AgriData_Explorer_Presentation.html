@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="slides-format" content="viewport">
+    <title>AgriData Explorer — Keerthana GC</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+        @theme {
+            --color-bg: #0D1B0E;
+            --color-bg-deep: #070F07;
+            --color-surface: #142016;
+            --color-text: #e8f5e9;
+            --color-text-secondary: #a5d6a7;
+            --color-text-muted: #6a9e6c;
+            --color-accent-1: #4ade80;
+            --color-accent-2: #a3b18a;
+            --color-accent-3: #d4a017;
+            --color-glass-bg: rgba(255,255,255,0.05);
+            --color-glass-border: rgba(74,222,128,0.10);
+            --color-vignette: rgba(0,0,0,0.55);
+            --font-display: 'Outfit', sans-serif;
+            --font-body: 'Outfit', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+    </style>
+    <style>
+        :root { --color-bg: #0D1B0E; --color-text: #e8f5e9; --glow-color-rgb: 74,222,128; }
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { background: var(--color-bg); margin: 0; }
+        body { font-family: 'Outfit', sans-serif; color: var(--color-text); overflow: hidden; height: 100vh; width: 100vw; }
+        .deck { width: 100vw; height: 100vh; position: relative; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--color-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transform: scale(0.95); transition: opacity 0.7s ease, transform 0.7s ease; pointer-events: none; overflow: hidden; }
+        .slide.active { opacity: 1; transform: scale(1); pointer-events: all; }
+        .slide > .content { position: relative; z-index: 2; width: 100%; max-width: 1100px; padding: clamp(1.2rem, 3vw, 3rem); }
+        .nav-controls { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; z-index: 100; background: rgba(13,27,14,0.85); backdrop-filter: blur(12px); padding: 8px 22px; border-radius: 40px; border: 1px solid rgba(74,222,128,0.18); }
+        .nav-btn { width: 36px; height: 36px; border: none; background: rgba(74,222,128,0.08); color: #4ade80; border-radius: 50%; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.3s; }
+        .nav-btn:hover { background: rgba(74,222,128,0.18); }
+        .slide-dots { display: flex; gap: 7px; }
+        .slide-dots .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(74,222,128,0.2); cursor: pointer; transition: background 0.3s, transform 0.3s; }
+        .slide-dots .dot.active { background: #4ade80; transform: scale(1.3); }
+        .slide-counter { font-size: 0.75rem; color: #6a9e6c; min-width: 36px; text-align: center; font-family: 'JetBrains Mono', monospace; }
+        .reveal { opacity: 0; transform: translateY(20px); }
+        .text-glow { text-shadow: 0 0 20px rgba(74,222,128,0.5), 0 0 40px rgba(74,222,128,0.2); }
+        .stat-glow { text-shadow: 0 0 30px rgba(74,222,128,0.6), 0 0 60px rgba(74,222,128,0.25); }
+        @keyframes glow-pulse { 0%,100%{text-shadow:0 0 20px rgba(74,222,128,0.5),0 0 40px rgba(74,222,128,0.2);}50%{text-shadow:0 0 35px rgba(74,222,128,0.9),0 0 70px rgba(74,222,128,0.35);} }
+        .glow-pulse { animation: glow-pulse 3s ease-in-out infinite; }
+        @keyframes float-slow { 0%{transform:translate(0,0) scale(1);}25%{transform:translate(60px,-50px) scale(1.12);}50%{transform:translate(-40px,40px) scale(0.9);}75%{transform:translate(50px,20px) scale(1.08);}100%{transform:translate(0,0) scale(1);} }
+        @keyframes float-drift { 0%{transform:translate(0,0) scale(1) rotate(0deg);}33%{transform:translate(-50px,-60px) scale(1.15) rotate(3deg);}66%{transform:translate(40px,30px) scale(0.88) rotate(-2deg);}100%{transform:translate(0,0) scale(1) rotate(0deg);} }
+        @keyframes float { 0%,100%{transform:translateY(0);}50%{transform:translateY(-14px);} }
+        .gradient-mesh { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+        .blob { position: absolute; border-radius: 50%; filter: blur(80px); animation: float-slow 10s ease-in-out infinite; }
+        .blob:nth-child(2) { animation: float-drift 14s ease-in-out infinite; }
+        .blob:nth-child(3) { animation: float-slow 18s ease-in-out infinite reverse; }
+        .slide::before { content:''; position:absolute; inset:0; z-index:1; pointer-events:none; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); background-repeat:repeat; background-size:256px 256px; opacity:0.03; mix-blend-mode:overlay; }
+        .slide::after { content:''; position:absolute; inset:0; z-index:1; pointer-events:none; background:radial-gradient(ellipse at center, transparent 50%, var(--color-vignette) 100%); }
+        .bar-chart { display:flex; align-items:flex-end; gap:clamp(0.4rem,1vw,0.75rem); height:clamp(100px,16vh,160px); }
+        .bar-col { display:flex; flex-direction:column; align-items:center; gap:0.3rem; flex:1; }
+        .bar { border-radius:6px 6px 0 0; width:100%; }
+        .bar-fill { border-radius: 6px; height: 22px; width: 0%; background: linear-gradient(90deg, #4ade80, #a3b18a); transition: width 0.7s ease; }
+        .bar-track { background: rgba(74,222,128,0.08); border-radius: 6px; overflow: hidden; height: 22px; flex: 1; }
+        .h-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .h-bar-label { font-size: 0.7rem; color: #a5d6a7; min-width: 110px; text-align: right; font-family: 'JetBrains Mono', monospace; }
+        .h-bar-val { font-size: 0.7rem; color: #4ade80; min-width: 40px; font-family: 'JetBrains Mono', monospace; }
+        .glass { background: rgba(255,255,255,0.045); backdrop-filter: blur(12px); border: 1px solid rgba(74,222,128,0.1); border-radius: 14px; }
+        .accent-border { border-left: 3px solid #4ade80; }
+        .gold-border { border-left: 3px solid #d4a017; }
+        .moss-border { border-left: 3px solid #a3b18a; }
+        .tag { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.04em; border: 1px solid rgba(74,222,128,0.3); color: #4ade80; background: rgba(74,222,128,0.08); }
+        .tag-gold { border-color: rgba(212,160,23,0.3); color: #d4a017; background: rgba(212,160,23,0.08); }
+        .tag-moss { border-color: rgba(163,177,138,0.3); color: #a3b18a; background: rgba(163,177,138,0.08); }
+        .num-badge { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, #4ade80, #22c55e); color: #0D1B0E; font-weight: 800; font-size: 0.8rem; flex-shrink: 0; }
+        @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration:0.01ms!important; transition-duration:0.2s!important; } }
+    </style>
+</head>
+<body>
+<div class="mouse-spotlight" style="position:fixed;inset:0;z-index:99;pointer-events:none;"></div>
+
+<div class="deck">
+
+<!-- SLIDE 1: TITLE -->
+<div class="slide slide-1 active" data-slide="1">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:500px;height:500px;top:-120px;right:-80px;background:#22c55e;opacity:0.13;"></div>
+        <div class="blob" style="width:350px;height:350px;bottom:-90px;left:-60px;background:#a3b18a;opacity:0.10;"></div>
+        <div class="blob" style="width:200px;height:200px;top:45%;left:12%;background:#d4a017;opacity:0.09;"></div>
+    </div>
+    <canvas class="particle-canvas" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content text-center">
+        <div style="font-size:100px;margin-bottom:14px;animation:float 3s ease-in-out infinite;" class="reveal">🌾</div>
+        <h1 style="font-family:'Outfit',sans-serif;font-size:clamp(2.4rem,5.5vw,4.5rem);font-weight:900;background:linear-gradient(135deg,#4ade80,#a3b18a,#d4a017);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-0.02em;margin-bottom:10px;" class="reveal">AgriData Explorer</div>
+        <p style="font-size:clamp(0.85rem,1.4vw,1.1rem);letter-spacing:5px;text-transform:uppercase;color:#6a9e6c;margin-bottom:22px;" class="reveal">Understanding Indian Agriculture with EDA</p>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;" class="reveal">
+            <span class="tag">Python</span>
+            <span class="tag-gold">SQL</span>
+            <span class="tag-moss">Power BI</span>
+            <span class="tag">EDA</span>
+            <span class="tag-gold">ICRISAT Dataset</span>
+        </div>
+        <p style="margin-top:18px;font-size:0.8rem;color:#4a7d4c;letter-spacing:2px;" class="reveal">DOMAIN: AGRICULTURAL DATA ANALYTICS</p>
+    </div>
+</div>
+
+<!-- SLIDE 2: PROJECT OVERVIEW -->
+<div class="slide slide-2" data-slide="2">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:380px;height:380px;top:-80px;right:-60px;background:#22c55e;opacity:0.09;"></div>
+        <div class="blob" style="width:240px;height:240px;bottom:-60px;left:-40px;background:#a3b18a;opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <div class="reveal" style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+            <span style="font-size:1.6rem;">🌱</span>
+            <h2 style="font-size:clamp(1.6rem,3vw,2.4rem);font-weight:800;color:#4ade80;">Project Overview</h2>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div class="glass accent-border reveal" style="padding:18px;">
+                <div style="font-size:1.4rem;margin-bottom:8px;">🎯</div>
+                <div style="font-size:0.78rem;text-transform:uppercase;letter-spacing:2px;color:#6a9e6c;margin-bottom:6px;">Objective</div>
+                <p style="font-size:0.88rem;color:#a5d6a7;line-height:1.55;">Build a data visualization platform integrating crop production, yield, and area data across Indian states & districts to enable data-driven decisions for farmers, policymakers, and researchers.</p>
+            </div>
+            <div class="glass gold-border reveal" style="padding:18px;">
+                <div style="font-size:1.4rem;margin-bottom:8px;">📦</div>
+                <div style="font-size:0.78rem;text-transform:uppercase;letter-spacing:2px;color:#6a9e6c;margin-bottom:6px;">Dataset — ICRISAT</div>
+                <p style="font-size:0.88rem;color:#a5d6a7;line-height:1.55;">District-level agricultural data covering <strong style="color:#4ade80;">313 districts</strong> across India, spanning <strong style="color:#4ade80;">51 years</strong> (1966–2017), with <strong style="color:#4ade80;">16,146 rows</strong> and <strong style="color:#4ade80;">80 columns</strong> covering 20+ crop types.</p>
+            </div>
+            <div class="glass moss-border reveal" style="padding:18px;">
+                <div style="font-size:1.4rem;margin-bottom:8px;">🛠️</div>
+                <div style="font-size:0.78rem;text-transform:uppercase;letter-spacing:2px;color:#6a9e6c;margin-bottom:6px;">Tech Stack</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">
+                    <span class="tag">Python (Pandas, Plotly)</span>
+                    <span class="tag-gold">MySQL</span>
+                    <span class="tag-moss">Power BI</span>
+                    <span class="tag">Jupyter Notebook</span>
+                </div>
+            </div>
+            <div class="glass accent-border reveal" style="padding:18px;">
+                <div style="font-size:1.4rem;margin-bottom:8px;">📊</div>
+                <div style="font-size:0.78rem;text-transform:uppercase;letter-spacing:2px;color:#6a9e6c;margin-bottom:6px;">Deliverables</div>
+                <ul style="font-size:0.85rem;color:#a5d6a7;line-height:1.7;padding-left:14px;">
+                    <li>Cleaned & structured dataset</li>
+                    <li>EDA with 15+ interactive charts</li>
+                    <li>SQL database + 10 business queries</li>
+                    <li>4-page interactive Power BI dashboard</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 3: DATA CLEANING -->
+<div class="slide slide-3" data-slide="3">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:320px;height:320px;top:-60px;right:-50px;background:#22c55e;opacity:0.08;"></div>
+        <div class="blob" style="width:200px;height:200px;bottom:-50px;left:-30px;background:#d4a017;opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <div class="reveal" style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+            <span style="font-size:1.5rem;">🧹</span>
+            <h2 style="font-size:clamp(1.5rem,2.8vw,2.2rem);font-weight:800;color:#4ade80;">Data Cleaning Pipeline</h2>
+        </div>
+        <div style="display:grid;grid-template-columns:1.1fr 0.9fr;gap:14px;align-items:start;">
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                <div class="glass accent-border reveal" style="padding:14px 16px;display:flex;align-items:flex-start;gap:12px;">
+                    <span class="num-badge">1</span>
+                    <div><div style="font-weight:700;color:#e8f5e9;font-size:0.9rem;">Handled Missing Values</div><div style="font-size:0.8rem;color:#a5d6a7;margin-top:3px;">Replaced NaN with 0 for crop area, production & yield; dropped rows with all-null records</div></div>
+                </div>
+                <div class="glass gold-border reveal" style="padding:14px 16px;display:flex;align-items:flex-start;gap:12px;">
+                    <span class="num-badge" style="background:linear-gradient(135deg,#d4a017,#f59e0b);color:#0D1B0E;">2</span>
+                    <div><div style="font-weight:700;color:#e8f5e9;font-size:0.9rem;">Removed Negative Values</div><div style="font-size:0.8rem;color:#a5d6a7;margin-top:3px;">Replaced negative crop production/yield entries with NaN then 0 — physically impossible values excluded</div></div>
+                </div>
+                <div class="glass moss-border reveal" style="padding:14px 16px;display:flex;align-items:flex-start;gap:12px;">
+                    <span class="num-badge" style="background:linear-gradient(135deg,#a3b18a,#6b7c5a);color:#0D1B0E;">3</span>
+                    <div><div style="font-weight:700;color:#e8f5e9;font-size:0.9rem;">Standardized Column Names</div><div style="font-size:0.8rem;color:#a5d6a7;margin-top:3px;">Stripped whitespace, converted to lowercase with underscores for consistent SQL and Pandas access</div></div>
+                </div>
+                <div class="glass accent-border reveal" style="padding:14px 16px;display:flex;align-items:flex-start;gap:12px;">
+                    <span class="num-badge">4</span>
+                    <div><div style="font-weight:700;color:#e8f5e9;font-size:0.9rem;">Unit Consistency Verified</div><div style="font-size:0.8rem;color:#a5d6a7;margin-top:3px;">All area values in 1000 ha, production in 1000 tons, yield in kg/ha — confirmed across all 80 columns</div></div>
+                </div>
+            </div>
+            <div class="glass reveal" style="padding:18px;">
+                <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:2px;color:#6a9e6c;margin-bottom:12px;">📋 Dataset Profile</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div style="text-align:center;padding:10px;background:rgba(74,222,128,0.06);border-radius:10px;">
+                        <div style="font-size:1.5rem;font-weight:900;color:#4ade80;" data-count="16146">0</div>
+                        <div style="font-size:0.68rem;color:#6a9e6c;margin-top:2px;">ROWS</div>
+                    </div>
+                    <div style="text-align:center;padding:10px;background:rgba(212,160,23,0.06);border-radius:10px;">
+                        <div style="font-size:1.5rem;font-weight:900;color:#d4a017;" data-count="80">0</div>
+                        <div style="font-size:0.68rem;color:#6a9e6c;margin-top:2px;">COLUMNS</div>
+                    </div>
+                    <div style="text-align:center;padding:10px;background:rgba(163,177,138,0.06);border-radius:10px;">
+                        <div style="font-size:1.5rem;font-weight:900;color:#a3b18a;" data-count="313">0</div>
+                        <div style="font-size:0.68rem;color:#6a9e6c;margin-top:2px;">DISTRICTS</div>
+                    </div>
+                    <div style="text-align:center;padding:10px;background:rgba(74,222,128,0.06);border-radius:10px;">
+                        <div style="font-size:1.5rem;font-weight:900;color:#4ade80;" data-count="51">0</div>
+                        <div style="font-size:0.68rem;color:#6a9e6c;margin-top:2px;">YEARS</div>
+                    </div>
+                </div>
+                <div style="margin-top:12px;padding:10px;background:rgba(74,222,128,0.04);border-radius:8px;font-size:0.75rem;color:#a5d6a7;line-height:1.5;">
+                    <strong style="color:#4ade80;">Source:</strong> ICRISAT District Level Data<br>
+                    <strong style="color:#4ade80;">Period:</strong> 1966 – 2017<br>
+                    <strong style="color:#4ade80;">Crops:</strong> Rice, Wheat, Maize, Cotton, Groundnut, Oilseeds, Sugarcane, Sunflower + more
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 4: EDA HIGHLIGHTS -->
+<div class="slide slide-4" data-slide="4">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:380px;height:380px;top:-70px;right:-50px;background:#22c55e;opacity:0.09;"></div>
+        <div class="blob" style="width:220px;height:220px;bottom:-50px;left:-40px;background:#a3b18a;opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <div class="reveal" style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <span style="font-size:1.5rem;">🔍</span>
+            <h2 style="font-size:clamp(1.5rem,2.8vw,2.2rem);font-weight:800;color:#4ade80;">Exploratory Data Analysis</h2>
+            <span class="tag" style="margin-left:auto;">15+ Visualizations</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+            <div class="glass accent-border reveal" style="padding:13px;">
+                <div style="font-size:1.1rem;margin-bottom:5px;">🌾</div>
+                <div style="font-size:0.78rem;font-weight:700;color:#e8f5e9;margin-bottom:4px;">Rice Production</div>
+                <div style="font-size:0.73rem;color:#a5d6a7;">Top 7 rice-producing states; West Bengal leads with highest output. Bar plot analysis.</div>
+            </div>
+            <div class="glass gold-border reveal" style="padding:13px;">
+                <div style="font-size:1.1rem;margin-bottom:5px;">🌾</div>
+                <div style="font-size:0.78rem;font-weight:700;color:#e8f5e9;margin-bottom:4px;">Wheat Analysis</div>
+                <div style="font-size:0.73rem;color:#a5d6a7;">Top 5 wheat states with bar chart + pie chart (% share). Punjab & UP dominate.</div>
+            </div>
+            <div class="glass moss-border reveal" style="padding:13px;">
+                <div style="font-size:1.1rem;margin-bottom:5px;">🫒</div>
+                <div style="font-size:0.78rem;font-weight:700;color:#e8f5e9;margin-bottom:4px;">Oilseed States</div>
+                <div style="font-size:0.73rem;color:#a5d6a7;">Top 5 oilseed-producing states; Rajasthan & MP show highest cultivation areas.</div>
+            </div>
+            <div class="glass accent-border reveal" style="padding:13px;">
+                <div style="font-size:1.1rem;margin-bottom:5px;">🌻</div>
+                <div style="font-size:0.78rem;font-weight:700;color:#e8f5e9;margin-bottom:4px;">Sunflower Production</div>
+                <div style="font-size:0.73rem;color:#a5d6a7;">Top 7 sunflower states; Karnataka leads followed by Maharashtra and Andhra Pradesh.</div>
+            </div>
+            <div class="glass gold-border reveal" style="padding:13px;">
+                <div style="font-size:1.1rem;margin-bottom:5px;">🎋</div>
+                <div style="font-size:0.78rem;font-weight:700;color:#e8f5e9;margin-bottom:4px;">Sugarcane 50-Year Trend</div>
+                <div style="font-size:0.73rem;color:#a5d6a7;">Production growth line plot from 1966–2017; UP & Maharashtra are top producers.</div>
+            </div>
+            <div class="glass moss-border reveal" style="padding:13px;">
+                <div style="font-size:1.1rem;margin-bottom:5px;">📈</div>
+                <div style="font-size:0.78rem;font-weight:700;color:#e8f5e9;margin-bottom:4px;">Rice vs Wheat (50 Yrs)</div>
+                <div style="font-size:0.73rem;color:#a5d6a7;">Long-term trend comparison showing rice maintaining consistently higher production levels.</div>
+            </div>
+            <div class="glass accent-border reveal" style="padding:13px;">
+                <div style="font-size:1.1rem;margin-bottom:5px;">🥜</div>
+                <div style="font-size:0.78rem;font-weight:700;color:#e8f5e9;margin-bottom:4px;">Groundnut States</div>
+                <div style="font-size:0.73rem;color:#a5d6a7;">Top 7 groundnut-producing states; Gujarat & Rajasthan lead production.</div>
+            </div>
+            <div class="glass gold-border reveal" style="padding:13px;">
+                <div style="font-size:1.1rem;margin-bottom:5px;">🫘</div>
+                <div style="font-size:0.78rem;font-weight:700;color:#e8f5e9;margin-bottom:4px;">Soybean Efficiency</div>
+                <div style="font-size:0.73rem;color:#a5d6a7;">Top 5 soybean states with yield efficiency comparison; MP leads production.</div>
+            </div>
+            <div class="glass moss-border reveal" style="padding:13px;">
+                <div style="font-size:1.1rem;margin-bottom:5px;">🔗</div>
+                <div style="font-size:0.78rem;font-weight:700;color:#e8f5e9;margin-bottom:4px;">Area vs Production</div>
+                <div style="font-size:0.73rem;color:#a5d6a7;">Strong positive correlation between cultivated area and production for Rice, Wheat & Maize.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 5: SQL QUESTIONS -->
+<div class="slide slide-5" data-slide="5">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:350px;height:350px;top:-60px;right:-50px;background:#22c55e;opacity:0.08;"></div>
+        <div class="blob" style="width:200px;height:200px;bottom:-50px;left:-30px;background:#d4a017;opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <div class="reveal" style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <span style="font-size:1.5rem;">🗄️</span>
+            <h2 style="font-size:clamp(1.5rem,2.8vw,2.2rem);font-weight:800;color:#4ade80;">SQL Database & Business Questions</h2>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div style="display:flex;flex-direction:column;gap:8px;">
+                <div class="glass reveal" style="padding:11px 14px;display:flex;align-items:flex-start;gap:10px;">
+                    <span class="num-badge" style="flex-shrink:0;width:24px;height:24px;font-size:0.72rem;">1</span>
+                    <span style="font-size:0.8rem;color:#a5d6a7;">Year-wise Trend of Rice Production Across Top 3 States</span>
+                </div>
+                <div class="glass reveal" style="padding:11px 14px;display:flex;align-items:flex-start;gap:10px;">
+                    <span class="num-badge" style="flex-shrink:0;width:24px;height:24px;font-size:0.72rem;">2</span>
+                    <span style="font-size:0.8rem;color:#a5d6a7;">Top 5 Districts by Wheat Yield Increase (Last 5 Years)</span>
+                </div>
+                <div class="glass reveal" style="padding:11px 14px;display:flex;align-items:flex-start;gap:10px;">
+                    <span class="num-badge" style="flex-shrink:0;width:24px;height:24px;font-size:0.72rem;">3</span>
+                    <span style="font-size:0.8rem;color:#a5d6a7;">States with Highest Growth in Oilseed Production (5-Year Growth Rate)</span>
+                </div>
+                <div class="glass reveal" style="padding:11px 14px;display:flex;align-items:flex-start;gap:10px;">
+                    <span class="num-badge" style="flex-shrink:0;width:24px;height:24px;font-size:0.72rem;">4</span>
+                    <span style="font-size:0.8rem;color:#a5d6a7;">District-wise Correlation: Area vs Production (Rice, Wheat, Maize)</span>
+                </div>
+                <div class="glass reveal" style="padding:11px 14px;display:flex;align-items:flex-start;gap:10px;">
+                    <span class="num-badge" style="flex-shrink:0;width:24px;height:24px;font-size:0.72rem;">5</span>
+                    <span style="font-size:0.8rem;color:#a5d6a7;">Yearly Production Growth of Cotton in Top 5 Cotton-Producing States</span>
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+                <div class="glass reveal" style="padding:11px 14px;display:flex;align-items:flex-start;gap:10px;">
+                    <span class="num-badge" style="flex-shrink:0;width:24px;height:24px;font-size:0.72rem;">6</span>
+                    <span style="font-size:0.8rem;color:#a5d6a7;">Districts with Highest Groundnut Production in 2017</span>
+                </div>
+                <div class="glass reveal" style="padding:11px 14px;display:flex;align-items:flex-start;gap:10px;">
+                    <span class="num-badge" style="flex-shrink:0;width:24px;height:24px;font-size:0.72rem;">7</span>
+                    <span style="font-size:0.8rem;color:#a5d6a7;">Annual Average Maize Yield Across All States (Trend Analysis)</span>
+                </div>
+                <div class="glass reveal" style="padding:11px 14px;display:flex;align-items:flex-start;gap:10px;">
+                    <span class="num-badge" style="flex-shrink:0;width:24px;height:24px;font-size:0.72rem;">8</span>
+                    <span style="font-size:0.8rem;color:#a5d6a7;">Total Area Cultivated for Oilseeds in Each State</span>
+                </div>
+                <div class="glass reveal" style="padding:11px 14px;display:flex;align-items:flex-start;gap:10px;">
+                    <span class="num-badge" style="flex-shrink:0;width:24px;height:24px;font-size:0.72rem;">9</span>
+                    <span style="font-size:0.8rem;color:#a5d6a7;">Districts with the Highest Rice Yield (kg/ha)</span>
+                </div>
+                <div class="glass reveal" style="padding:11px 14px;display:flex;align-items:flex-start;gap:10px;">
+                    <span class="num-badge" style="flex-shrink:0;width:24px;height:24px;font-size:0.72rem;">10</span>
+                    <span style="font-size:0.8rem;color:#a5d6a7;">Compare Wheat and Rice Production for Top 5 States Over 10 Years</span>
+                </div>
+            </div>
+        </div>
+        <div class="glass reveal" style="padding:10px 16px;margin-top:10px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:0.85rem;">⚙️</span>
+            <span style="font-size:0.78rem;color:#a5d6a7;font-family:'JetBrains Mono',monospace;">MySQL database created via Python (mysql-connector-python) · Tables: crop_data · Queries executed via SQLAlchemy</span>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 6: POWER BI DASHBOARD -->
+<div class="slide slide-6" data-slide="6">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:360px;height:360px;top:-70px;right:-50px;background:#22c55e;opacity:0.09;"></div>
+        <div class="blob" style="width:220px;height:220px;bottom:-50px;left:-30px;background:#a3b18a;opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <div class="reveal" style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <span style="font-size:1.5rem;">📊</span>
+            <h2 style="font-size:clamp(1.5rem,2.8vw,2.2rem);font-weight:800;color:#4ade80;">Power BI Dashboard — 4 Pages</h2>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
+            <div class="glass accent-border reveal" style="padding:16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <span style="background:linear-gradient(135deg,#4ade80,#22c55e);color:#0D1B0E;padding:4px 10px;border-radius:20px;font-size:0.7rem;font-weight:800;">PAGE 1</span>
+                    <span style="font-weight:700;color:#e8f5e9;font-size:0.9rem;">Overview</span>
+                </div>
+                <ul style="font-size:0.78rem;color:#a5d6a7;line-height:1.75;padding-left:14px;">
+                    <li>KPI cards: Total Rice (3.63M), Wheat (2.94M), Cotton (116.73K), Maize Yield (1.79)</li>
+                    <li>Rice Production Growth Trend — Top 3 States (Punjab, UP, West Bengal)</li>
+                    <li>Donut chart: Top 5 Rice Producing States share</li>
+                    <li>Slicers: State, District, Year range slider (1966–2017)</li>
+                </ul>
+            </div>
+            <div class="glass gold-border reveal" style="padding:16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <span style="background:linear-gradient(135deg,#d4a017,#f59e0b);color:#0D1B0E;padding:4px 10px;border-radius:20px;font-size:0.7rem;font-weight:800;">PAGE 2</span>
+                    <span style="font-weight:700;color:#e8f5e9;font-size:0.9rem;">Growth Analysis</span>
+                </div>
+                <ul style="font-size:0.78rem;color:#a5d6a7;line-height:1.75;padding-left:14px;">
+                    <li>Top 5 Districts: Wheat Yield Increase — Vidisha (2146 kg/ha)</li>
+                    <li>Top 5 States: Oilseed Production Growth (AP: +0.45, Haryana: +0.22)</li>
+                    <li>Top 7 Sunflower Producing States — Karnataka leads</li>
+                    <li>Sugarcane Trend & Cotton Production Growth (Top 5 states)</li>
+                </ul>
+            </div>
+            <div class="glass moss-border reveal" style="padding:16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <span style="background:linear-gradient(135deg,#a3b18a,#6b7c5a);color:#0D1B0E;padding:4px 10px;border-radius:20px;font-size:0.7rem;font-weight:800;">PAGE 3</span>
+                    <span style="font-weight:700;color:#e8f5e9;font-size:0.9rem;">Yield Analysis</span>
+                </div>
+                <ul style="font-size:0.78rem;color:#a5d6a7;line-height:1.75;padding-left:14px;">
+                    <li>Annual Average Maize Yield Trend: 1.0 (1966) → 3.6 (2017) kg/ha</li>
+                    <li>Crop Yield Comparison: Rice vs Wheat vs Maize (1966–2017)</li>
+                    <li>Top Districts by Rice Yield: Sangrur & Ludhiana (4.1 kg/ha)</li>
+                    <li>Wheat consistently higher yield than maize; maize improving steadily</li>
+                </ul>
+            </div>
+            <div class="glass accent-border reveal" style="padding:16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <span style="background:linear-gradient(135deg,#4ade80,#22c55e);color:#0D1B0E;padding:4px 10px;border-radius:20px;font-size:0.7rem;font-weight:800;">PAGE 4</span>
+                    <span style="font-weight:700;color:#e8f5e9;font-size:0.9rem;">Area & Correlation</span>
+                </div>
+                <ul style="font-size:0.78rem;color:#a5d6a7;line-height:1.75;padding-left:14px;">
+                    <li>State-wise Total Area Cultivated for Oilseeds (Bing Map visual)</li>
+                    <li>Top 5 Oilseed States bar chart — Madhya Pradesh, Gujarat lead</li>
+                    <li>Top Districts: Groundnut Production 2017 — Junagadh (29.8K), Ananthapur (19.1K)</li>
+                    <li>Scatter plots: Rice, Wheat, Maize — strong positive area-production correlation</li>
+                </ul>
+            </div>
+        </div>
+        <div class="reveal" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+            <span class="tag">DAX Measures</span><span class="tag-gold">Drillthrough</span><span class="tag-moss">Bookmarks</span><span class="tag">Dynamic Slicers</span><span class="tag-gold">Filled Map</span><span class="tag-moss">KPI Cards</span>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 7: KEY FINDINGS -->
+<div class="slide slide-7" data-slide="7">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:360px;height:360px;top:-70px;right:-50px;background:#22c55e;opacity:0.09;"></div>
+        <div class="blob" style="width:220px;height:220px;bottom:-50px;left:-30px;background:#a3b18a;opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <div class="reveal" style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <span style="font-size:1.5rem;">💡</span>
+            <h2 style="font-size:clamp(1.5rem,2.8vw,2.2rem);font-weight:800;color:#4ade80;">Key Findings & Insights</h2>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+            <div class="glass accent-border reveal" style="padding:14px;">
+                <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:2px;color:#4ade80;margin-bottom:6px;">🌾 Rice Production</div>
+                <p style="font-size:0.82rem;color:#a5d6a7;line-height:1.55;">West Bengal, Uttar Pradesh & Punjab are the top 3 rice-producing states. West Bengal's districts (Rice Belt) show consistently high output. Rice production has grown <strong style="color:#4ade80;">3x over 51 years</strong>.</p>
+            </div>
+            <div class="glass gold-border reveal" style="padding:14px;">
+                <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:2px;color:#d4a017;margin-bottom:6px;">📈 Maize Yield Growth</div>
+                <p style="font-size:0.82rem;color:#a5d6a7;line-height:1.55;">Annual average maize yield rose steadily from <strong style="color:#d4a017;">1.0 kg/ha (1966)</strong> to <strong style="color:#d4a017;">3.6 kg/ha (2017)</strong> — a 3.6x improvement driven by irrigation upgrades and improved seed varieties.</p>
+            </div>
+            <div class="glass moss-border reveal" style="padding:14px;">
+                <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:2px;color:#a3b18a;margin-bottom:6px;">🥜 Groundnut Districts (2017)</div>
+                <p style="font-size:0.82rem;color:#a5d6a7;line-height:1.55;">Junagadh (29.8K tons) leads groundnut production in 2017, followed by Ananthapur (19.1K), Rajkot (17.4K), Jamnagar (17.4K) — all from Gujarat & Andhra Pradesh, indicating regional specialization.</p>
+            </div>
+            <div class="glass accent-border reveal" style="padding:14px;">
+                <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:2px;color:#4ade80;margin-bottom:6px;">🌾 Wheat Yield Districts</div>
+                <p style="font-size:0.82rem;color:#a5d6a7;line-height:1.55;">Vidisha (MP) tops wheat yield increase at <strong style="color:#4ade80;">+2,146 kg/ha</strong> over last 5 years, followed by Darjeeling (1,839) and Shajapur (1,684) — indicating improved farming practices in MP.</p>
+            </div>
+            <div class="glass gold-border reveal" style="padding:14px;">
+                <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:2px;color:#d4a017;margin-bottom:6px;">🫒 Oilseed Growth States</div>
+                <p style="font-size:0.82rem;color:#a5d6a7;line-height:1.55;">Andhra Pradesh (+0.45) and Haryana (+0.22) show highest oilseed production growth. Assam, Gujarat, Chhattisgarh show <strong style="color:#d4a017;">negative growth (−1.0)</strong> indicating sharp cultivation decline.</p>
+            </div>
+            <div class="glass moss-border reveal" style="padding:14px;">
+                <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:2px;color:#a3b18a;margin-bottom:6px;">🔗 Area–Production Correlation</div>
+                <p style="font-size:0.82rem;color:#a5d6a7;line-height:1.55;">Strong positive correlation confirmed between cultivated area and production for Rice, Wheat & Maize. However, district-level scatter variations indicate differences in <strong style="color:#a3b18a;">yield efficiency & irrigation access</strong>.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 8: BUSINESS USE CASES -->
+<div class="slide slide-8" data-slide="8">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:340px;height:340px;top:-60px;right:-50px;background:#22c55e;opacity:0.08;"></div>
+        <div class="blob" style="width:200px;height:200px;bottom:-50px;left:-30px;background:#d4a017;opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <div class="reveal" style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+            <span style="font-size:1.5rem;">🎯</span>
+            <h2 style="font-size:clamp(1.5rem,2.8vw,2.2rem);font-weight:800;color:#4ade80;">Business Use Cases</h2>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+            <div class="glass accent-border reveal" style="padding:18px;">
+                <div style="font-size:2rem;margin-bottom:10px;">👨‍🌾</div>
+                <div style="font-weight:700;color:#e8f5e9;font-size:0.95rem;margin-bottom:8px;">Farmers</div>
+                <ul style="font-size:0.78rem;color:#a5d6a7;line-height:1.7;padding-left:14px;">
+                    <li>Explore historical crop data to choose best crop per season</li>
+                    <li>Identify regional productivity gaps for soil & irrigation improvement</li>
+                </ul>
+            </div>
+            <div class="glass gold-border reveal" style="padding:18px;">
+                <div style="font-size:2rem;margin-bottom:10px;">🏛️</div>
+                <div style="font-weight:700;color:#e8f5e9;font-size:0.95rem;margin-bottom:8px;">Policymakers</div>
+                <ul style="font-size:0.78rem;color:#a5d6a7;line-height:1.7;padding-left:14px;">
+                    <li>Identify low-productivity regions for subsidy allocation</li>
+                    <li>Design crop insurance policies based on yield fluctuation data</li>
+                </ul>
+            </div>
+            <div class="glass moss-border reveal" style="padding:18px;">
+                <div style="font-size:2rem;margin-bottom:10px;">🔬</div>
+                <div style="font-weight:700;color:#e8f5e9;font-size:0.95rem;margin-bottom:8px;">Researchers</div>
+                <ul style="font-size:0.78rem;color:#a5d6a7;line-height:1.7;padding-left:14px;">
+                    <li>Analyze climate & irrigation impact on yields over 51 years</li>
+                    <li>Identify areas for high-yield variety innovation & pest management</li>
+                </ul>
+            </div>
+        </div>
+        <div class="glass reveal" style="padding:14px 20px;margin-top:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;text-align:center;">
+            <div><div style="font-size:1.3rem;font-weight:900;color:#4ade80;" data-count="16146" data-suffix="">0</div><div style="font-size:0.68rem;color:#6a9e6c;margin-top:2px;text-transform:uppercase;letter-spacing:1px;">Records</div></div>
+            <div><div style="font-size:1.3rem;font-weight:900;color:#d4a017;" data-count="20" data-suffix="+">0</div><div style="font-size:0.68rem;color:#6a9e6c;margin-top:2px;text-transform:uppercase;letter-spacing:1px;">Crop Types</div></div>
+            <div><div style="font-size:1.3rem;font-weight:900;color:#a3b18a;" data-count="10" data-suffix="">0</div><div style="font-size:0.68rem;color:#6a9e6c;margin-top:2px;text-transform:uppercase;letter-spacing:1px;">SQL Queries</div></div>
+            <div><div style="font-size:1.3rem;font-weight:900;color:#4ade80;" data-count="4" data-suffix="">0</div><div style="font-size:0.68rem;color:#6a9e6c;margin-top:2px;text-transform:uppercase;letter-spacing:1px;">PBI Pages</div></div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 9: THANK YOU -->
+<div class="slide slide-9" data-slide="9">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:500px;height:500px;top:-100px;right:-80px;background:#22c55e;opacity:0.14;"></div>
+        <div class="blob" style="width:350px;height:350px;bottom:-80px;left:-60px;background:#a3b18a;opacity:0.11;"></div>
+        <div class="blob" style="width:200px;height:200px;top:40%;left:10%;background:#d4a017;opacity:0.09;"></div>
+    </div>
+    <canvas class="particle-canvas" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content text-center">
+        <div style="font-size:90px;margin-bottom:14px;animation:float 3s ease-in-out infinite;" class="reveal">🌿</div>
+        <h1 style="font-family:'Outfit',sans-serif;font-size:clamp(2.2rem,5vw,4rem);font-weight:900;background:linear-gradient(135deg,#4ade80,#a3b18a,#d4a017);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-0.02em;margin-bottom:10px;" class="reveal">Thank You!</h1>
+        <p style="font-size:clamp(0.85rem,1.4vw,1.1rem);letter-spacing:4px;text-transform:uppercase;color:#6a9e6c;margin-bottom:20px;" class="reveal">AgriData Explorer — Completed Successfully</p>
+        <div class="glass reveal" style="display:inline-block;padding:16px 36px;margin-bottom:22px;border-radius:16px;">
+            <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:3px;color:#6a9e6c;margin-bottom:6px;">Done by</div>
+            <div style="font-size:clamp(1.2rem,2.5vw,1.9rem);font-weight:800;color:#4ade80;" class="glow-pulse">Keerthana GC</div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;" class="reveal">
+            <span class="tag">Python</span>
+            <span class="tag-gold">MySQL</span>
+            <span class="tag-moss">Power BI</span>
+            <span class="tag">EDA</span>
+            <span class="tag-gold">ICRISAT</span>
+            <span class="tag-moss">Data Analytics</span>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<!-- NAVIGATION -->
+<div class="nav-controls">
+    <button class="nav-btn" onclick="changeSlide(-1)">&#8249;</button>
+    <div class="slide-dots" id="dots"></div>
+    <button class="nav-btn" onclick="changeSlide(1)">&#8250;</button>
+    <span class="slide-counter" id="counter">1 / 9</span>
+</div>
+
+<script>
+    let current = 1;
+    const total = document.querySelectorAll('.slide').length;
+    const dotsContainer = document.getElementById('dots');
+    const counter = document.getElementById('counter');
+    for (let i = 1; i <= total; i++) { const dot = document.createElement('div'); dot.className = 'dot' + (i === 1 ? ' active' : ''); dot.onclick = () => goToSlide(i); dotsContainer.appendChild(dot); }
+    function goToSlide(n) { const prev = document.querySelector('.slide.active'); const next = document.querySelector('.slide[data-slide="'+n+'"]'); if (prev) prev.classList.remove('active'); if (next) { next.classList.add('active'); animateSlide(next); } current = n; updateNav(); }
+    function changeSlide(dir) { let next = current + dir; if (next < 1) next = total; if (next > total) next = 1; goToSlide(next); }
+    function updateNav() { document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i + 1 === current)); counter.textContent = current + ' / ' + total; }
+    document.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); changeSlide(1); } if (e.key === 'ArrowLeft') { e.preventDefault(); changeSlide(-1); } });
+    let touchStartX = 0;
+    document.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; });
+    document.addEventListener('touchend', e => { const diff = touchStartX - e.changedTouches[0].clientX; if (Math.abs(diff) > 50) changeSlide(diff > 0 ? 1 : -1); });
+
+    function animateSlide(slide) {
+        slide.querySelectorAll('.reveal').forEach((el, i) => {
+            el.style.transition = 'none'; el.style.opacity = '0'; el.style.transform = 'translateY(20px)'; el.offsetHeight;
+            const delay = i * 0.07;
+            el.style.transition = `opacity 0.35s ease ${delay}s, transform 0.35s ease ${delay}s`;
+            el.style.opacity = '1'; el.style.transform = 'translateY(0px)';
+        });
+        animateEffects(slide);
+    }
+    function animateEffects(slide) {
+        slide.querySelectorAll('[data-count]:not(.counted)').forEach(el => {
+            el.classList.add('counted');
+            const target = parseInt(el.dataset.count), suffix = el.dataset.suffix || '', prefix = el.dataset.prefix || '';
+            let cur = 0; const step = target / 40;
+            const timer = setInterval(() => { cur += step; if (cur >= target) { cur = target; clearInterval(timer); } el.textContent = prefix + Math.round(cur).toLocaleString() + suffix; }, 28);
+        });
+        slide.querySelectorAll('.bar-fill:not(.fill-init)').forEach((bar, i) => {
+            bar.classList.add('fill-init'); bar.style.width = '0%'; bar.style.transition = `width 0.6s ease ${i * 0.08}s`; bar.offsetHeight; bar.style.width = bar.dataset.width + '%';
+        });
+    }
+
+    window.initParticles = function(canvas, opts) {
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+        const count = opts.count || 45; let mx = -1000, my = -1000;
+        const particles = Array.from({ length: count }, () => ({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, vx:(Math.random()-0.5)*0.3, vy:(Math.random()-0.5)*0.3, size:Math.random()*2.2+0.7, alpha:Math.random()*0.3+0.08 }));
+        canvas.addEventListener('mousemove', e => { const r = canvas.getBoundingClientRect(); mx = e.clientX-r.left; my = e.clientY-r.top; });
+        canvas.addEventListener('mouseleave', () => { mx=-1000; my=-1000; });
+        (function anim() {
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            particles.forEach(p => {
+                const dx=p.x-mx,dy=p.y-my,dist=Math.sqrt(dx*dx+dy*dy);
+                if(dist<110){const f=(110-dist)/110*1.8;p.vx+=(dx/dist)*f*0.1;p.vy+=(dy/dist)*f*0.1;}
+                p.vx*=0.98;p.vy*=0.98;p.x+=p.vx;p.y+=p.vy;
+                if(p.x<0)p.x=canvas.width;if(p.x>canvas.width)p.x=0;if(p.y<0)p.y=canvas.height;if(p.y>canvas.height)p.y=0;
+                ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fillStyle=`rgba(74,222,128,${p.alpha})`;ctx.fill();
+            });
+            requestAnimationFrame(anim);
+        })();
+    };
+    document.querySelectorAll('.particle-canvas').forEach(c => initParticles(c, { count: 50 }));
+
+    document.addEventListener('mousemove', e => {
+        const s = document.querySelector('.mouse-spotlight');
+        if (s) s.style.background = `radial-gradient(600px circle at ${e.clientX}px ${e.clientY}px, rgba(74,222,128,0.055), transparent 40%)`;
+    });
+
+    try { animateSlide(document.querySelector('.slide.active')); } catch(e) {}
+</script>
+</body>
+</html>
